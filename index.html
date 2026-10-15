@@ -34,20 +34,21 @@
           <p class="status" id="status-events">Optional. Adds markers to the timeline.</p>
         </div>
         <div class="slot" id="slot-directory">
-          <label for="file-directory">Provider names</label>
+          <label for="file-directory">Provider names (to search by name)</label>
           <input type="file" id="file-directory" accept=".csv,text/csv">
-          <p class="status" id="status-directory">Optional. Lets you search by name. Keep this file private.</p>
+          <p class="status" id="status-directory">Optional if your encounters or shifts export already has a provider name column. Keep this file private.</p>
         </div>
         <button type="button" class="link" id="btnSample">Try it with made-up sample data</button>
       </section>
 
       <section>
         <h2>Choose a provider</h2>
-        <label for="pid">Provider name or ID</label>
+        <label for="pid" id="pidLabel">Provider name</label>
         <div class="combo">
           <input type="text" id="pid" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="pidResults" aria-autocomplete="list" placeholder="Type a name or ID">
           <ul id="pidResults" role="listbox" aria-label="Matching providers" hidden></ul>
         </div>
+        <p class="hint" id="nameHint"></p>
         <div class="dates">
           <div><label for="dStart">From</label><input type="date" id="dStart"></div>
           <div><label for="dEnd">To</label><input type="date" id="dEnd"></div>

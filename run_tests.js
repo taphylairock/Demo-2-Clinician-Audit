@@ -186,6 +186,16 @@ test('names file also accepts a single name column; bad headers give a clear err
   assert.strictEqual(C.loadDirectory(C.parseCSV('foo,bar\n1,2'), cfg).quality[0].level, 'error');
 });
 
+test('names inside the encounters or shifts export are picked up with no names file', function () {
+  var e = C.loadEncounters(C.parseCSV('practitioner_id,encounter_id,Practitioner Name\nnp1,e1,Jane Smith\nnp1,e2,Jane Smith\nnp2,e3,'), cfg);
+  var s = C.loadShifts(C.parseCSV('employee_id,start,end,Employee Name\nnp9,2026-03-02 14:00:00,2026-03-02 22:00:00,Lee Wong'), cfg);
+  assert.deepStrictEqual(e.names, [{ pid: 'np1', name: 'Jane Smith' }]);
+  assert.deepStrictEqual(s.names, [{ pid: 'np9', name: 'Lee Wong' }]);
+  var m = C.buildModel(cfg, { encounters: e.records, shifts: s.records, events: [], directory: e.names.concat(s.names), encCols: e.cols });
+  assert.strictEqual(C.searchProviders(m, 'wong').matches[0].pid, 'np9');
+  assert.strictEqual(C.searchProviders(m, 'jane').matches[0].pid, 'np1');
+});
+
 console.log('Sample data');
 test('sample data produces the flags the demo promises', function () {
   global.window = global.window || {};

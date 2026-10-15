@@ -222,6 +222,13 @@
     return null;
   }
 
+  function namesList(obj) { return Object.keys(obj).map(function (pid) { return { pid: pid, name: obj[pid] }; }); }
+
+  function nameFromRow(g, row) {
+    var n = g.get(row, 'practitioner_name') || (g.get(row, 'practitioner_first_name') + ' ' + g.get(row, 'practitioner_last_name')).trim();
+    return n.replace(/\s+/g, ' ');
+  }
+
   function loadEncounters(csv, cfg) {
     var quality = [], cols = resolveColumns(csv.headers, cfg.columns.encounters), records = [];
     if (cols.practitioner_id < 0 || cols.encounter_id < 0) {
@@ -230,10 +237,11 @@
         ' were not found. Add your column name to js/config.js.'));
       return { records: records, quality: quality, cols: cols };
     }
-    var bad = {}, g = makeGetters(cols, cfg.sourceTimezone, bad), skipped = 0, unknownRole = 0;
+    var bad = {}, g = makeGetters(cols, cfg.sourceTimezone, bad), skipped = 0, unknownRole = 0, names = {};
     csv.rows.forEach(function (row) {
       var pid = g.get(row, 'practitioner_id'), eid = g.get(row, 'encounter_id');
       if (!pid || !eid) { skipped++; return; }
+      var nm = nameFromRow(g, row); if (nm && !names[pid]) names[pid] = nm;
       var roleRaw = g.get(row, 'role'), role = normalizeRole(roleRaw, cfg);
       if (roleRaw && !role) unknownRole++;
       var secs = parseFloat(g.get(row, 'secs_active'));
@@ -254,7 +262,7 @@
     if (unknownRole) quality.push(q('warn', 'Encounters file: ' + unknownRole + ' row(s) had a role that is not recognised. Add it to roleAliases in js/config.js.'));
     reportMissing(cols, quality, 'Encounters file');
     reportBad(bad, quality, 'Encounters file');
-    return { records: records, quality: quality, cols: cols };
+    return { records: records, quality: quality, cols: cols, names: namesList(names) };
   }
 
   function loadDirectory(csv, cfg) {
@@ -293,10 +301,11 @@
       quality.push(q('error', 'Shifts file: the required column(s) ' + req.join(', ') + ' were not found. Add your column name to js/config.js.'));
       return { records: records, quality: quality, cols: cols };
     }
-    var bad = {}, g = makeGetters(cols, cfg.sourceTimezone, bad), skipped = 0, unknownRole = 0, n = 0;
+    var bad = {}, g = makeGetters(cols, cfg.sourceTimezone, bad), skipped = 0, unknownRole = 0, n = 0, names = {};
     csv.rows.forEach(function (row) {
       var pid = g.get(row, 'practitioner_id'), s = g.ts(row, 'start_at'), e = g.ts(row, 'end_at');
       if (!pid || s == null || e == null || e <= s) { skipped++; return; }
+      var nm = nameFromRow(g, row); if (nm && !names[pid]) names[pid] = nm;
       var roleRaw = g.get(row, 'role'), role = normalizeRole(roleRaw, cfg);
       if (roleRaw && !role) unknownRole++;
       var typeRaw = g.get(row, 'shift_type');
@@ -309,7 +318,7 @@
     if (unknownRole) quality.push(q('warn', 'Shifts file: ' + unknownRole + ' row(s) had a role that is not recognised. Add it to roleAliases in js/config.js.'));
     reportMissing(cols, quality, 'Shifts file');
     reportBad(bad, quality, 'Shifts file');
-    return { records: records, quality: quality, cols: cols };
+    return { records: records, quality: quality, cols: cols, names: namesList(names) };
   }
 
   function loadEvents(csv, cfg) {

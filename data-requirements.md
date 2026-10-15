@@ -30,6 +30,8 @@ Care managers often message patients without taking ownership. `participant_join
 
 To make care manager flags reliable, the master report needs a **per-message** source: one row per message with `encounter_id`, `practitioner_id` (sender) and `sent_at`. Please ask whether that can be added.
 
+**Provider name (optional, recommended):** add `practitioner_name` (or `practitioner_first_name` and `practitioner_last_name`) to this file and users can search by name with no extra file.
+
 ## File 2: Scheduled shifts (required)
 
 One row per scheduled shift, for **all providers**.
@@ -42,7 +44,7 @@ One row per scheduled shift, for **all providers**.
 | `shift_type` | Words such as "On-call", "Training", "Admin" so those shifts are not flagged like regular shifts |
 | `care_group_id` | Which province the provider worked in |
 
-This can come from `dim_practitioner_worktimes` or from Humanity.
+This can come from `dim_practitioner_worktimes` or from Humanity. If it includes `employee_name` or `practitioner_name`, that is also used for searching by name.
 
 ## File 3: Other activity (optional)
 

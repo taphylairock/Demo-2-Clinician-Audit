@@ -121,3 +121,6 @@ tr:last-child td { border-bottom: 0; }
 #pidResults li small { display: block; color: var(--slate); font-size: .8rem; }
 #pidResults li.more { cursor: default; color: var(--slate); font-size: .82rem; }
 #pidResults li.more:hover { background: none; }
+
+.hint { margin: .35rem 0 0; font-size: .82rem; color: var(--slate); }
+.hint.warn { color: var(--amber); background: var(--amber-soft); padding: .4rem .55rem; border-left: 3px solid #C98A12; }

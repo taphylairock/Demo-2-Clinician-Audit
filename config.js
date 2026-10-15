@@ -88,7 +88,11 @@
         secs_active:        ['secs_of_participants_activity'],
         intake_preference:  ['intake_preference', 'consult_preference', 'intake_modality'],
         video_started_at:   ['video_call_started_at', 'video_started_at'],
-        had_video_call:     ['had_video_call', 'video_call_had', 'video_call_happened']
+        had_video_call:     ['had_video_call', 'video_call_had', 'video_call_happened'],
+        // Optional: if your report already has the provider's name, search by name works with no extra file.
+        practitioner_name:       ['practitioner_name', 'provider_name', 'practitioner_full_name', 'full_name'],
+        practitioner_first_name: ['practitioner_first_name', 'provider_first_name'],
+        practitioner_last_name:  ['practitioner_last_name', 'provider_last_name']
       },
 
       // Scheduled shifts (from dim_practitioner_worktimes or Humanity).
@@ -98,7 +102,11 @@
         end_at:          ['end_at', 'shift_end', 'end'],                                             // required
         role:            ['role', 'practitioner_role', 'position'],
         shift_type:      ['shift_type', 'type', 'schedule_type', 'shift_name'],
-        care_group_id:   ['care_group_id', 'care_group', 'location']
+        care_group_id:   ['care_group_id', 'care_group', 'location'],
+        // Optional: Humanity usually includes the employee's name.
+        practitioner_name:       ['practitioner_name', 'provider_name', 'employee_name', 'staff_name', 'full_name'],
+        practitioner_first_name: ['practitioner_first_name', 'employee_first_name', 'first_name'],
+        practitioner_last_name:  ['practitioner_last_name', 'employee_last_name', 'last_name']
       },
 
       // Optional list of provider names, used ONLY to search by name. Names are

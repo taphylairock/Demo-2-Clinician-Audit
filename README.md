@@ -42,6 +42,8 @@ Save the files in the `my-data` folder (it is excluded from Git).
 Each time you reopen the page you load the files again. Nothing is kept between visits, which is deliberate.
 
 ### About names
+There are two ways to search by name. Either (1) include a provider name column in your Metabase encounters or shifts export (for example `practitioner_name`, or `employee_name` from Humanity), or (2) load a separate **Provider names** file. The box under "Choose a provider" tells you whether names are loaded. If it says "No names loaded yet", only IDs work.
+
 Names are only used to find the provider on screen. They are **not** needed in the encounters or shifts files, and the tool still works on IDs underneath, so searching by ID always works too.
 
 - Keep the names file in `my-data` and never upload it to GitHub (CSV files are excluded by `.gitignore`).

@@ -55,16 +55,20 @@
       var res = kind === 'encounters' ? C.loadEncounters(csv, cfg) : kind === 'shifts' ? C.loadShifts(csv, cfg) :
         kind === 'directory' ? C.loadDirectory(csv, cfg) : C.loadEvents(csv, cfg);
       data[kind] = res.records;
+      if (res.names && res.names.length) { data.fileNames = (data.fileNames || []).concat(res.names); }
       data.quality = data.quality.concat(res.quality);
       if (kind === 'encounters') data.encCols = res.cols;
       var errors = res.quality.filter(function (x) { return x.level === 'error'; });
       if (errors.length) setStatus(kind, errors[0].text, 'bad');
-      else { state.loaded[kind] = true; setStatus(kind, state.names[kind] + ': ' + res.records.length.toLocaleString() + (kind === 'directory' ? ' names read' : ' rows read'), 'ok'); }
+      else { state.loaded[kind] = true; setStatus(kind, state.names[kind] + ': ' + res.records.length.toLocaleString() + (kind === 'directory' ? ' names read' : ' rows read') +
+        (res.names && res.names.length && kind !== 'directory' ? ', ' + res.names.length.toLocaleString() + ' provider names found' : ''), 'ok'); }
     });
+    // Names: the names file wins; otherwise names found inside the encounters or shifts files.
+    data.directory = data.directory.concat(data.fileNames || []);
     state.model = C.buildModel(cfg, data);
     state.model.quality = data.quality;
+    updateNameHint();
 
-    $('pid').placeholder = state.model.names.size ? 'Type a name or ID' : 'Type an ID (load names to search by name)';
     closeResults();
     setDefaultDates(data);
     setMessage('');
@@ -100,6 +104,19 @@
   });
 
   // ---------- searching for a provider (by name or ID) ----------
+  function updateNameHint() {
+    var n = state.model.names.size, hint = $('nameHint');
+    if (n) {
+      $('pidLabel').textContent = 'Provider name';
+      $('pid').placeholder = 'Start typing a name';
+      hint.className = 'hint'; hint.textContent = 'Searching by name (' + n.toLocaleString() + ' names loaded). An ID also works.';
+    } else {
+      $('pidLabel').textContent = 'Provider ID';
+      $('pid').placeholder = 'Type a provider ID';
+      hint.className = 'hint warn';
+      hint.textContent = 'No names loaded yet, so only IDs work. To search by name, load a Provider names file, or use an export that includes a provider name column.';
+    }
+  }
   function nameOf(pid) { return state.model && state.model.names.get(pid) || ''; }
   function displayOf(pid) { return nameOf(pid) || pid; }
 
@@ -513,4 +530,13 @@
       return '<div class="q ' + i.level + '"><small>' + label[i.level] + '</small>' + esc(i.text) + '</div>';
     }).join('');
   }
+
+  // First paint, before any file is loaded
+  (function () {
+    var hint = $('nameHint');
+    $('pidLabel').textContent = 'Provider name';
+    $('pid').placeholder = 'Load your files first';
+    hint.className = 'hint';
+    hint.textContent = 'Load your files, then search here by provider name.';
+  })();
 })();
