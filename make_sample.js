@@ -85,8 +85,11 @@ var evRows = [
   ['cm_demo', at(11, 5), 'Slack', 'message_sent'], ['cm_demo', at(13, 45), 'Slack', 'message_sent']
 ].map(function (r) { return [r[0], iso(r[1]), r[2], r[3]].join(','); });
 
+var dirRows = ['np_demo,Nora Demo', 'np_peer1,Sam Peer-One', 'np_peer2,Jo Peer-Two', 'cm_demo,Casey Demo', 'cm_peer,Drew Peer', 'np_call,Quinn Oncall', 'np_admin,Avery Admin'];
+
 var out = 'window.SAMPLE_DATA = ' + JSON.stringify({
   note: 'Made-up data for demonstration only.',
+  directory: 'practitioner_id,name\n' + dirRows.join('\n'),
   suggestedProvider: 'np_demo', suggestedStart: '2026-03-02', suggestedEnd: '2026-03-02',
   encounters: encHeader + '\n' + encRows.join('\n'),
   shifts: shiftHeader + '\n' + shiftRows.join('\n'),

@@ -33,14 +33,21 @@
           <input type="file" id="file-events" accept=".csv,text/csv">
           <p class="status" id="status-events">Optional. Adds markers to the timeline.</p>
         </div>
+        <div class="slot" id="slot-directory">
+          <label for="file-directory">Provider names</label>
+          <input type="file" id="file-directory" accept=".csv,text/csv">
+          <p class="status" id="status-directory">Optional. Lets you search by name. Keep this file private.</p>
+        </div>
         <button type="button" class="link" id="btnSample">Try it with made-up sample data</button>
       </section>
 
       <section>
         <h2>Choose a provider</h2>
-        <label for="pid">Provider ID</label>
-        <input type="text" id="pid" list="pidList" autocomplete="off" spellcheck="false" placeholder="Paste or type an ID">
-        <datalist id="pidList"></datalist>
+        <label for="pid">Provider name or ID</label>
+        <div class="combo">
+          <input type="text" id="pid" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="pidResults" aria-autocomplete="list" placeholder="Type a name or ID">
+          <ul id="pidResults" role="listbox" aria-label="Matching providers" hidden></ul>
+        </div>
         <div class="dates">
           <div><label for="dStart">From</label><input type="date" id="dStart"></div>
           <div><label for="dEnd">To</label><input type="date" id="dEnd"></div>
@@ -53,7 +60,7 @@
     <main class="main" id="main">
       <div class="empty" id="empty">
         <h2>Start by loading your files</h2>
-        <p>Load the encounters file and the shifts file on the left, enter a provider ID, then choose <strong>Run audit</strong>. Not sure what to load? Choose the sample data link to see how it works.</p>
+        <p>Load the encounters file and the shifts file on the left, search for a provider by name or ID, then choose <strong>Run audit</strong>. Not sure what to load? Choose the sample data link to see how it works.</p>
       </div>
 
       <div id="results" hidden>

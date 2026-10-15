@@ -13,7 +13,7 @@ Checks a virtual-care provider's day, minute by minute, for possible time fraud:
 2. Double-click `index.html`. It opens in your browser.
 3. Choose **Try it with made-up sample data**.
 
-You will see a timeline for a made-up provider, `np_demo`. Try `cm_demo` (a care manager) and `np_call` (an on-call shift, which is not flagged) in the Provider ID box.
+You will see a timeline for a made-up provider, Nora Demo. Try searching `casey` (a care manager) or `quinn` (an on-call shift, which is not flagged). The names are made up.
 
 ## Use it with real data
 
@@ -24,6 +24,7 @@ You will see a timeline for a made-up provider, `np_demo`. Try `cm_demo` (a care
 | Encounters and consults | One row per provider per encounter, for **all** providers | Yes |
 | Scheduled shifts | One row per shift, for **all** providers | Yes |
 | Other activity | Slack or CHR events, to show what the provider did during a gap | No |
+| Provider names | Two columns: provider ID and name. Only used to search by name | No |
 
 In Metabase, open the master report, set the dates, and choose **Download results > .csv**.
 The exact columns are listed in [`docs/data-requirements.md`](docs/data-requirements.md). Send that page to your data team.
@@ -36,9 +37,17 @@ Save the files in the `my-data` folder (it is excluded from Git).
 
 1. Open `index.html`.
 2. Under **Load your data**, choose each file.
-3. Type or paste a provider ID, set the dates, and choose **Run audit**.
+3. Search for the provider and set the dates. Type part of a name (in any order, for example `smith jane` or `Smith, Jane`) or an ID, pick them from the list, and choose **Run audit**. If several providers match, the list shows each one with their ID and role so you can choose the right one.
 
 Each time you reopen the page you load the files again. Nothing is kept between visits, which is deliberate.
+
+### About names
+Names are only used to find the provider on screen. They are **not** needed in the encounters or shifts files, and the tool still works on IDs underneath, so searching by ID always works too.
+
+- Keep the names file in `my-data` and never upload it to GitHub (CSV files are excluded by `.gitignore`).
+- The flags CSV you download contains IDs only. If you want a name column in it, set `includeNamesInCsv: true` in `js/config.js`, but then treat that file as sensitive.
+- Names tied to minute-by-minute activity make the result identifiable. Confirm with privacy or HR that this is acceptable before the first audit conversation.
+- The names usually come from the provider table in Metabase (`dim_practitioners`). Ask the data team for `practitioner_id` and name.
 
 ## Reading the results
 
@@ -94,7 +103,8 @@ Open `js/config.js` in Notepad, change the value, save, and refresh the page.
 | What you see | What to do |
 |---|---|
 | "required column not found" | Add your column name in `js/config.js`, or ask the data team for that column |
-| No provider found | Check for typos and extra spaces in the ID. The box suggests IDs from your files |
+| No provider found | Try part of the name, or the ID. Names only work if you loaded the Provider names file |
+| "Is in the names file but has no shifts or encounters" | The person has a name on file but nothing in the exports for these files. Check the dates and the exports |
 | Times look hours off | Change `sourceTimezone` in `js/config.js` |
 | Few or no patients waiting | The encounters file may only contain this provider's encounters. It needs everyone's |
 | "No scheduled shifts found" | The shifts file uses a different ID than the encounters file |

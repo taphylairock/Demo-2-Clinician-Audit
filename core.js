@@ -257,6 +257,24 @@
     return { records: records, quality: quality, cols: cols };
   }
 
+  function loadDirectory(csv, cfg) {
+    var quality = [], cols = resolveColumns(csv.headers, cfg.columns.directory), records = [];
+    var hasName = cols.name >= 0 || cols.first_name >= 0 || cols.last_name >= 0;
+    if (cols.practitioner_id < 0 || !hasName) {
+      quality.push(q('error', 'Names file: needs a practitioner_id column and a name column (or first_name and last_name). Add your column names to js/config.js.'));
+      return { records: records, quality: quality, cols: cols };
+    }
+    var g = makeGetters(cols, cfg.sourceTimezone, {}), skipped = 0;
+    csv.rows.forEach(function (row) {
+      var pid = g.get(row, 'practitioner_id');
+      var name = g.get(row, 'name') || (g.get(row, 'first_name') + ' ' + g.get(row, 'last_name')).trim();
+      if (!pid || !name) { skipped++; return; }
+      records.push({ pid: pid, name: name.replace(/\s+/g, ' ') });
+    });
+    if (skipped) quality.push(q('warn', 'Names file: ' + skipped + ' row(s) had no ID or no name and were skipped.'));
+    return { records: records, quality: quality, cols: cols };
+  }
+
   function classifyShiftType(raw, cfg) {
     var k = String(raw || '').toLowerCase();
     if (!k.trim()) return 'regular';
@@ -330,7 +348,7 @@
   function buildModel(cfg, data) {
     var enc = data.encounters || [], shifts = data.shifts || [], events = data.events || [];
     var m = {
-      cfg: cfg, enc: enc, shifts: shifts, events: events,
+      cfg: cfg, enc: enc, shifts: shifts, events: events, names: new Map(),
       encByPid: new Map(), shiftsByPid: new Map(), eventsByPid: new Map(),
       ivCache: new Map(), roleCache: new Map(), qsCache: null, quality: [], queueEncs: []
     };
@@ -338,6 +356,7 @@
     shifts.forEach(function (s) { pushTo(m.shiftsByPid, s.pid, s); });
     events.forEach(function (e) { pushTo(m.eventsByPid, e.pid, e); });
     shifts.forEach(function (s) { s.policy = policyOf(cfg, s.type); });
+    (data.directory || []).forEach(function (d) { if (!m.names.has(d.pid)) m.names.set(d.pid, d.name); });
 
     var set = new Set();
     m.encByPid.forEach(function (_, k) { set.add(k); });
@@ -369,6 +388,42 @@
     });
     m.queueStats = { total: byEnc.size, used: m.queueEncs.length, noStart: noStart, noEnd: noEnd };
     return m;
+  }
+
+  // ---------- searching by name or ID ----------
+  function fold(s) {
+    return String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/,/g, ' ');
+  }
+  // Every word typed must appear somewhere in the name or ID, in any order,
+  // so "smith jane", "jane smi" and "Smith, Jane" all find Jane Smith.
+  function searchProviders(model, query, limit) {
+    var tokens = fold(query).split(/\s+/).filter(Boolean);
+    var out = { matches: [], noData: [] };
+    if (!tokens.length) return out;
+    var withData = {};
+    model.providers.forEach(function (p) { withData[p] = 1; });
+    function score(pid, name) {
+      var id = fold(pid), nm = fold(name), hay = id + ' ' + nm;
+      for (var i = 0; i < tokens.length; i++) if (hay.indexOf(tokens[i]) === -1) return -1;
+      var full = tokens.join(' ');
+      if (id === full || nm === full) return 0;
+      if (nm.indexOf(tokens[0]) === 0 || nm.indexOf(' ' + tokens[0]) !== -1 || id.indexOf(tokens[0]) === 0) return 1;
+      return 2;
+    }
+    var found = [];
+    model.providers.forEach(function (pid) {
+      var name = model.names.get(pid) || '', sc = score(pid, name);
+      if (sc >= 0) found.push({ pid: pid, name: name, role: primaryRole(model, pid), score: sc });
+    });
+    found.sort(function (a, b) { return a.score - b.score || (a.name || a.pid).localeCompare(b.name || b.pid); });
+    out.matches = found.slice(0, limit || 8);
+    out.total = found.length;
+    if (!found.length) {
+      model.names.forEach(function (name, pid) {
+        if (!withData[pid] && score(pid, name) >= 0 && out.noData.length < 5) out.noData.push({ pid: pid, name: name });
+      });
+    }
+    return out;
   }
 
   function policyOf(cfg, type) { return cfg.shiftTypePolicy[type] || 'flag'; }
@@ -629,7 +684,8 @@
   var api = {
     MIN: MIN, parseCSV: parseCSV, parseTimestamp: parseTimestamp, wallToEpoch: wallToEpoch,
     fmtHM: fmtHM, fmtDate: fmtDate, dayStart: dayStart, nextDayStart: nextDayStart, partsAt: partsAt,
-    loadEncounters: loadEncounters, loadShifts: loadShifts, loadEvents: loadEvents,
+    loadEncounters: loadEncounters, loadShifts: loadShifts, loadEvents: loadEvents, loadDirectory: loadDirectory,
+    searchProviders: searchProviders, primaryRole: primaryRole,
     buildModel: buildModel, audit: audit, waitStats: waitStats, intervalsFor: intervalsFor,
     classifyShiftType: classifyShiftType, normalizeRole: normalizeRole, resolveColumns: resolveColumns
   };

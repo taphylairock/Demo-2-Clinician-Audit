@@ -154,6 +154,38 @@ test('bad data does not crash: missing times and unknown columns', function () {
   assert.strictEqual(C.audit(m, 'nobody', 0, 1).found, false);
 });
 
+console.log('Search by name');
+function nameModel() {
+  var m = build([enc('np1', 'NP', 'e1', et(9, 0), et(9, 3), et(9, 5), et(9, 30), et(9, 5)), enc('np2', 'NP', 'e2', et(9, 0), et(9, 3), et(9, 5), et(9, 30), et(9, 5)),
+    enc('np3', 'NP', 'e3', et(9, 0), et(9, 3), et(9, 5), et(9, 30), et(9, 5))], []);
+  var d = C.loadDirectory(C.parseCSV('practitioner_id,first_name,last_name\nnp1,Jane,Smith\nnp2,Jane,Smythe\nnp3,\u00C9lise,Tremblay\nghost,Nobody,Here'), cfg);
+  m.names = new Map(d.records.map(function (x) { return [x.pid, x.name]; }));
+  return m;
+}
+test('finds by first name, last name, partial, either order, and "Last, First"', function () {
+  var m = nameModel();
+  ['jane smith', 'SMITH jane', 'Smith, Jane', 'jan smi'].forEach(function (q) {
+    var r = C.searchProviders(m, q); assert.strictEqual(r.matches.length, 1, q); assert.strictEqual(r.matches[0].pid, 'np1');
+  });
+});
+test('ignores accents and still finds by ID', function () {
+  var m = nameModel();
+  assert.strictEqual(C.searchProviders(m, 'elise').matches[0].pid, 'np3');
+  assert.strictEqual(C.searchProviders(m, 'np2').matches[0].pid, 'np2');
+});
+test('similar names return all matches; best match first', function () {
+  var r = C.searchProviders(nameModel(), 'jane');
+  assert.deepStrictEqual(r.matches.map(function (x) { return x.pid; }).sort(), ['np1', 'np2']);
+});
+test('a name with no data in the loaded files is reported, not silently lost', function () {
+  var r = C.searchProviders(nameModel(), 'nobody');
+  assert.strictEqual(r.matches.length, 0); assert.strictEqual(r.noData[0].pid, 'ghost');
+});
+test('names file also accepts a single name column; bad headers give a clear error', function () {
+  assert.strictEqual(C.loadDirectory(C.parseCSV('practitioner_id,name\nx,Ann Lee'), cfg).records[0].name, 'Ann Lee');
+  assert.strictEqual(C.loadDirectory(C.parseCSV('foo,bar\n1,2'), cfg).quality[0].level, 'error');
+});
+
 console.log('Sample data');
 test('sample data produces the flags the demo promises', function () {
   global.window = global.window || {};

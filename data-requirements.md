@@ -54,3 +54,14 @@ Slack, CHR or anything else with a person and a time. Adds markers to the timeli
 | `timestamp` (required) | |
 | `source` | For example Slack or CHR |
 | `event_type` | For example message_sent, chart_opened |
+
+## File 4: Provider names (optional)
+
+Only needed to search by name. Two columns, one row per provider. Keep it private.
+
+| Column | |
+|---|---|
+| `practitioner_id` (required) | Same ID as the other files |
+| `name` (required) | Full name. Alternatively `first_name` and `last_name` |
+
+Names are never required in Files 1 to 3.

@@ -65,6 +65,10 @@
     trueValues: ['true', 't', 'yes', 'y', '1'],
     falseValues: ['false', 'f', 'no', 'n', '0'],
 
+    // Names stay on screen only. Set to true if you also want a provider_name column
+    // in the flags CSV you download. Leave false if that file will be shared or stored.
+    includeNamesInCsv: false,
+
     // ---- 3. COLUMNS -------------------------------------------------------
     columns: {
 
@@ -95,6 +99,15 @@
         role:            ['role', 'practitioner_role', 'position'],
         shift_type:      ['shift_type', 'type', 'schedule_type', 'shift_name'],
         care_group_id:   ['care_group_id', 'care_group', 'location']
+      },
+
+      // Optional list of provider names, used ONLY to search by name. Names are
+      // never needed in the other files. Either one "name" column or first + last.
+      directory: {
+        practitioner_id: ['practitioner_id', 'provider_id', 'id'],                                   // required
+        name:            ['name', 'full_name', 'practitioner_name', 'provider_name', 'display_name'],
+        first_name:      ['first_name', 'firstname', 'given_name'],
+        last_name:       ['last_name', 'lastname', 'surname', 'family_name']
       },
 
       // Optional extra activity (Slack, CHR, anything with a person and a time).

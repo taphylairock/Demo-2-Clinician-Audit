@@ -4,7 +4,7 @@
   var C = window.AuditCore, cfg = window.AUDIT_CONFIG, TZ = cfg.timezone, MIN = C.MIN;
   var $ = function (id) { return document.getElementById(id); };
 
-  var state = { text: {}, names: {}, parsed: {}, loaded: {}, model: null, result: null, days: [], dayIdx: 0 };
+  var state = { text: {}, names: {}, parsed: {}, loaded: {}, model: null, result: null, days: [], dayIdx: 0, selectedPid: null, activeOpt: -1 };
 
   // ---------- helpers ----------
   function esc(s) {
@@ -28,7 +28,7 @@
   $('tzLabel').textContent = tzNames[TZ] || TZ;
 
   // ---------- loading files ----------
-  var KINDS = ['encounters', 'shifts', 'events'];
+  var KINDS = ['encounters', 'shifts', 'events', 'directory'];
 
   function readFile(kind, file) {
     var reader = new FileReader();
@@ -47,24 +47,25 @@
   }
 
   function rebuild() {
-    var data = { encounters: [], shifts: [], events: [], quality: [] };
+    var data = { encounters: [], shifts: [], events: [], directory: [], quality: [] };
     state.loaded = {};
     KINDS.forEach(function (kind) {
       var csv = state.parsed[kind];
       if (!csv) return;
-      var res = kind === 'encounters' ? C.loadEncounters(csv, cfg) : kind === 'shifts' ? C.loadShifts(csv, cfg) : C.loadEvents(csv, cfg);
+      var res = kind === 'encounters' ? C.loadEncounters(csv, cfg) : kind === 'shifts' ? C.loadShifts(csv, cfg) :
+        kind === 'directory' ? C.loadDirectory(csv, cfg) : C.loadEvents(csv, cfg);
       data[kind] = res.records;
       data.quality = data.quality.concat(res.quality);
       if (kind === 'encounters') data.encCols = res.cols;
       var errors = res.quality.filter(function (x) { return x.level === 'error'; });
       if (errors.length) setStatus(kind, errors[0].text, 'bad');
-      else { state.loaded[kind] = true; setStatus(kind, state.names[kind] + ': ' + res.records.length.toLocaleString() + ' rows read', 'ok'); }
+      else { state.loaded[kind] = true; setStatus(kind, state.names[kind] + ': ' + res.records.length.toLocaleString() + (kind === 'directory' ? ' names read' : ' rows read'), 'ok'); }
     });
     state.model = C.buildModel(cfg, data);
     state.model.quality = data.quality;
 
-    var dl = $('pidList');
-    dl.innerHTML = state.model.providers.map(function (p) { return '<option value="' + esc(p) + '">'; }).join('');
+    $('pid').placeholder = state.model.names.size ? 'Type a name or ID' : 'Type an ID (load names to search by name)';
+    closeResults();
     setDefaultDates(data);
     setMessage('');
   }
@@ -90,30 +91,106 @@
     state.sampleJustLoaded = true;
     KINDS.forEach(function (k) { $('file-' + k).value = ''; });
     state.text = {}; state.parsed = {};
-    ['encounters', 'shifts', 'events'].forEach(function (k) { state.text[k] = S[k]; state.names[k] = 'Sample ' + k; state.parsed[k] = C.parseCSV(S[k]); });
+    KINDS.forEach(function (k) { if (S[k]) { state.text[k] = S[k]; state.names[k] = 'Sample ' + k; state.parsed[k] = C.parseCSV(S[k]); } });
     rebuild();
-    $('pid').value = S.suggestedProvider;
+    state.selectedPid = S.suggestedProvider;
+    $('pid').value = displayOf(S.suggestedProvider);
     $('dStart').value = S.suggestedStart; $('dEnd').value = S.suggestedEnd;
     run();
   });
 
+  // ---------- searching for a provider (by name or ID) ----------
+  function nameOf(pid) { return state.model && state.model.names.get(pid) || ''; }
+  function displayOf(pid) { return nameOf(pid) || pid; }
+
+  function closeResults() {
+    $('pidResults').hidden = true; $('pidResults').innerHTML = '';
+    $('pid').setAttribute('aria-expanded', 'false'); $('pid').removeAttribute('aria-activedescendant');
+    state.activeOpt = -1;
+  }
+  function showResults(query) {
+    if (!state.model || !query.trim()) { closeResults(); return; }
+    var res = C.searchProviders(state.model, query, 8), list = $('pidResults');
+    if (!res.matches.length) { closeResults(); return; }
+    var h = res.matches.map(function (m, i) {
+      var sub = (m.name ? esc(m.pid) : '') + (m.role ? (m.name ? ' \u00B7 ' : '') + esc(m.role) : '');
+      return '<li role="option" id="opt-' + i + '" data-pid="' + esc(m.pid) + '" aria-selected="false">' + esc(m.name || m.pid) + (sub ? '<small>' + sub + '</small>' : '') + '</li>';
+    }).join('');
+    if (res.total > res.matches.length) h += '<li class="more" aria-hidden="true">' + (res.total - res.matches.length) + ' more. Keep typing to narrow it down.</li>';
+    list.innerHTML = h; list.hidden = false;
+    $('pid').setAttribute('aria-expanded', 'true');
+    state.activeOpt = -1;
+  }
+  function choose(pid) {
+    state.selectedPid = pid;
+    $('pid').value = displayOf(pid);
+    closeResults();
+  }
+  function moveActive(delta) {
+    var opts = $('pidResults').querySelectorAll('[role=option]');
+    if (!opts.length) return;
+    state.activeOpt = (state.activeOpt + delta + opts.length) % opts.length;
+    opts.forEach(function (o, i) { o.setAttribute('aria-selected', String(i === state.activeOpt)); });
+    var a = opts[state.activeOpt];
+    $('pid').setAttribute('aria-activedescendant', a.id);
+    a.scrollIntoView({ block: 'nearest' });
+  }
+  $('pid').addEventListener('input', function (e) { state.selectedPid = null; showResults(e.target.value); });
+  $('pid').addEventListener('focus', function (e) { if (e.target.value && !state.selectedPid) showResults(e.target.value); });
+  $('pid').addEventListener('blur', function () { setTimeout(closeResults, 120); });
+  $('pid').addEventListener('keydown', function (e) {
+    var open = !$('pidResults').hidden;
+    if (e.key === 'ArrowDown') { if (!open) showResults(e.target.value); moveActive(1); e.preventDefault(); }
+    else if (e.key === 'ArrowUp' && open) { moveActive(-1); e.preventDefault(); }
+    else if (e.key === 'Escape') { closeResults(); }
+    else if (e.key === 'Enter') {
+      var opts = $('pidResults').querySelectorAll('[role=option]');
+      if (open && state.activeOpt >= 0 && opts[state.activeOpt]) { choose(opts[state.activeOpt].getAttribute('data-pid')); }
+      run();
+      e.preventDefault();
+    }
+  });
+  $('pidResults').addEventListener('mousedown', function (e) {
+    var li = e.target.closest('[role=option]');
+    if (li) { e.preventDefault(); choose(li.getAttribute('data-pid')); }
+  });
+
+  // Turns whatever is in the box into one provider ID, or an explanation of why it cannot.
+  function resolveProvider() {
+    var text = $('pid').value.trim();
+    if (!text) return { error: 'Enter a provider name or ID.' };
+    if (state.selectedPid && displayOf(state.selectedPid) === text) return { pid: state.selectedPid };
+    if (state.model.providers.indexOf(text) !== -1) return { pid: text };
+    var res = C.searchProviders(state.model, text, 8);
+    if (res.matches.length === 1) { choose(res.matches[0].pid); return { pid: res.matches[0].pid }; }
+    if (res.matches.length > 1) {
+      showResults(text);
+      return { error: (res.total || res.matches.length) + ' providers match \u201C' + text + '\u201D. Choose one from the list.' };
+    }
+    if (res.noData.length) {
+      return { error: res.noData.map(function (n) { return n.name; }).join(', ') + ' is in the names file but has no shifts or encounters in the files you loaded.' };
+    }
+    return { error: 'No provider found for \u201C' + text + '\u201D.' +
+      (state.model.names.size ? ' Check the spelling, or try part of the name.' : ' Load the names file to search by name, or check the ID for typos.') };
+  }
+
   // ---------- running the audit ----------
   $('btnRun').addEventListener('click', run);
-  $('pid').addEventListener('keydown', function (e) { if (e.key === 'Enter') run(); });
 
   function run() {
     if (!state.loaded.encounters || !state.loaded.shifts) {
       setMessage('Load the encounters file and the shifts file first.'); return;
     }
-    var pid = $('pid').value.trim();
-    if (!pid) { setMessage('Enter a provider ID.'); return; }
+    var who = resolveProvider();
+    if (who.error) { setMessage(who.error); return; }
+    var pid = who.pid;
     var s = $('dStart').value, e = $('dEnd').value;
     if (!s || !e) { setMessage('Choose a start and end date.'); return; }
     if (e < s) { setMessage('The end date is before the start date.'); return; }
     var from = C.dayStart(s, TZ), to = C.nextDayStart(e, TZ);
     var r = C.audit(state.model, pid, from, to);
     if (!r.found) {
-      setMessage('No provider with the ID "' + pid + '" appears in the loaded files. Check the ID for typos or extra spaces.');
+      setMessage('No data found for ' + displayOf(pid) + ' in the loaded files.');
       return;
     }
     setMessage('');
@@ -143,7 +220,7 @@
     var avgWait = mins ? wsum / mins : null;
     var provLoc = r.loc === 'ALL' ? 'all provinces' : r.loc;
     $('summary').innerHTML =
-      '<div class="who">' + esc(r.pid) + '<small>' + esc(r.role || 'role unknown') + ' \u00B7 ' + esc(provLoc) + '</small></div>' +
+      '<div class="who">' + esc(nameOf(r.pid) || r.pid) + '<small>' + (nameOf(r.pid) ? esc(r.pid) + ' \u00B7 ' : '') + esc(r.role || 'role unknown') + ' \u00B7 ' + esc(provLoc) + '</small></div>' +
       stat(r.shifts.length, (r.shifts.length === 1 ? 'shift' : 'shifts') + ' (' + checked + ' checked)') +
       stat(r.consults.length, r.consults.length === 1 ? 'consult counted' : 'consults counted') +
       stat(r.flags.length, r.flags.length === 1 ? 'flag' : 'flags', r.flags.length > 0) +
@@ -282,7 +359,7 @@
       var txt = Math.round(f.minutes) + ' min';
       out.push('<g><title>' + esc(f.label + ', ' + hm(f.start) + '\u2013' + hm(f.end) + ' (' + txt + '). ' + waitText(f)) + '</title>' +
         '<rect x="' + a + '" y="' + (Y.flag + 3) + '" width="' + Math.max(2, w) + '" height="' + (H.flag - 6) + '" rx="2" fill="#BE3227"/>' +
-        (w > 38 ? '<text x="' + (a + w / 2) + '" y="' + (Y.flag + 16) + '" text-anchor="middle" fill="#fff" font-weight="600">' + txt + '</text>' : '') + '</g>');
+        (w > 46 ? '<text x="' + (a + w / 2) + '" y="' + (Y.flag + 16) + '" text-anchor="middle" fill="#fff" font-weight="600">' + txt + '</text>' : '') + '</g>');
     });
 
     // other activity
@@ -376,11 +453,12 @@
   }
   $('btnCsv').addEventListener('click', function () {
     var rows = visibleFlags(), r = state.result;
-    var head = ['provider_id', 'date', 'start', 'end', 'minutes', 'flag', 'role', 'shift_type', 'intake_waiting_avg', 'intake_waiting_max', 'triaged_waiting_avg', 'triaged_waiting_max', 'confidence', 'notes'];
+    var withName = cfg.includeNamesInCsv && nameOf(r.pid);
+    var head = (withName ? ['provider_name'] : []).concat(['provider_id', 'date', 'start', 'end', 'minutes', 'flag', 'role', 'shift_type', 'intake_waiting_avg', 'intake_waiting_max', 'triaged_waiting_avg', 'triaged_waiting_max', 'confidence', 'notes']);
     var lines = [head.join(',')];
     rows.forEach(function (f) {
-      lines.push([r.pid, dkey(f.start), hm(f.start), hm(f.end), f.type === 'novideo' ? '' : Math.round(f.minutes), f.label, f.role, f.shiftType,
-        f.wait ? fmt1(f.wait.intakeAvg) : '', f.wait ? f.wait.intakeMax : '', f.wait ? fmt1(f.wait.triagedAvg) : '', f.wait ? f.wait.triagedMax : '', f.conf, f.note].map(csvCell).join(','));
+      lines.push([].concat(withName ? [nameOf(r.pid)] : [], [r.pid, dkey(f.start), hm(f.start), hm(f.end), f.type === 'novideo' ? '' : Math.round(f.minutes), f.label, f.role, f.shiftType,
+        f.wait ? fmt1(f.wait.intakeAvg) : '', f.wait ? f.wait.intakeMax : '', f.wait ? fmt1(f.wait.triagedAvg) : '', f.wait ? f.wait.triagedMax : '', f.conf, f.note]).map(csvCell).join(','));
     });
     var blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
     var a = document.createElement('a');
@@ -423,6 +501,10 @@
       items.push({ level: 'info', text: 'Queue depth uses ' + qs.used.toLocaleString() + ' of ' + qs.total.toLocaleString() + ' encounters. ' +
         (qs.noStart ? qs.noStart + ' had no start time. ' : '') + (qs.noEnd ? qs.noEnd + ' had no usable end of wait. ' : '') +
         'Queue depth is only as complete as the export: it needs every provider\u2019s encounters for the dates, not just this provider\u2019s.' });
+    }
+    if (state.loaded.directory) {
+      var missing = state.model.providers.filter(function (p) { return !state.model.names.has(p); }).length;
+      if (missing) items.push({ level: 'warn', text: missing + ' of ' + state.model.providers.length + ' providers in your data have no name in the names file. They can still be found by ID.' });
     }
     items.push({ level: 'info', text: 'Timestamps without a timezone are read as ' + cfg.sourceTimezone + ' and shown in ' + TZ + '. Change this in js/config.js if the times look shifted.' });
     var order = { error: 0, warn: 1, info: 2 }, label = { error: 'Problem', warn: 'Check this', info: 'Good to know' };
