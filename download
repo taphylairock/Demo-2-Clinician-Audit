@@ -1,0 +1,9 @@
+# Real exports and anything with provider activity must never be committed.
+my-data/*
+!my-data/README.txt
+*.csv
+*.xlsx
+*.duckdb
+.env
+.DS_Store
+node_modules/
